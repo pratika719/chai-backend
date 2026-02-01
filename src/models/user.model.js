@@ -69,7 +69,7 @@ userSchema.pre("save", async function () {
 });
 
 
-export const User = mongoose.model("User", userSchema);
+
 
 userSchema.methods.isPasswordCorrect = async function (password) {
     return await bcrypt.compare(password, this.password);
@@ -95,3 +95,5 @@ userSchema.methods.generateRefreshToken = function () {
         { expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN }
     );
 }
+
+export const User = mongoose.model("User", userSchema);
