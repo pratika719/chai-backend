@@ -6,6 +6,7 @@ import { ApiResponse } from "../utils/Apiresponce.js";
 import jwt from "jsonwebtoken"
 import { JsonWebTokenError } from "jsonwebtoken";
 
+
 const generateaccessandrefreshtokens= async (userId)=>{
     try{
         const user =  await User.findById(userId);
@@ -199,9 +200,10 @@ const refreshAccessToken=asyncHandler(async (req,res)=>{
        new ApiResponse(
            200,
            {accesstoken,newrefreshToken},
-           "access token rfreshed"
+           "access token refreshed"     
+
        )
-    )
+    )        
    
    
    
@@ -220,5 +222,195 @@ const refreshAccessToken=asyncHandler(async (req,res)=>{
 
 })
 
+const  changeCurrentPassword=asyncHandler(async(req,res)=>{
+    const {oldPassword,newPassword}=req.body;
 
-export { registerUser,loginUser,logoutUser,refreshAccessToken}
+ const user= await User.findById(req.user?._id)
+ const isPasswordCorrect=await user.isPasswordCorrect(oldPassword);
+
+
+ if(!isPasswordCorrect){
+    throw new ApiError(400," old password incorect")
+ }
+
+ user.password=newPassword
+ await user.save({validateBeforeSave:false});
+
+return res
+.status(200)
+.json(new ApiResponse(
+    200,{},"password changed succesfully")
+);
+});
+
+const getcurrentuser=asyncHandler(async(req,res)=>{
+    return res.
+    status(200,req.user,"current user fetch succesfully")
+})
+
+const updatAccountDetails=asyncHandler(async(req,res)=>{
+    const {fullname,email}=req.body;
+
+    if(!fullname  || !email){
+        throw new ApiError(400,"all fields are required");
+
+
+
+    }
+
+  const user= await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+        $set:{
+           fullname: fullname,
+            email:email
+                }
+    },
+    {new:true}
+
+).select("-password");
+
+return res.status(200)
+.json(new ApiResponse(200,user,"account details updated successfully"));
+});
+
+
+
+const updateUserAvatar=asyncHandler(async (req,res)=>{
+   const avatarLocalpath=req.file?.path
+
+   if(!avatarLocalpath){
+    throw new ApiError(400,"avatar file is missing")
+   }
+
+   const avatar=await uploadOnCloudinary(avatarLocalpath);
+
+   if(avatar.url){
+    throw new ApiError(400,"Error while uploading on avatar ")
+   }
+
+  const user= await User.findByIdAndUpdate(req.user?._id,
+    {
+        $set:{
+            avatar:avatar.url
+        }
+    },
+    {new:true}
+   ).select("-password")
+
+   
+return res
+.status(200)
+.json(
+    new ApiResponse(200,user,"avatar image updated succesfullty")
+)
+
+
+})
+
+const updateUserCoverImage=asyncHandler(async (req,res)=>{
+   const coverImageLocalpath=req.file?.path
+
+   if(!coverImageLocalpath){
+    throw new ApiError(400,"avatar file is missing")
+   }
+
+   const coverImage=await uploadOnCloudinary(coverImageLocalpath);
+
+   if(coverImage.url){
+    throw new ApiError(400,"Error while uploading on avatar ")
+   }
+
+ const user = await User.findByIdAndUpdate(req.user?._id,
+    {
+        $set:{
+            coverImage:coverImage.url
+        }
+
+
+    },
+    {new:true}
+   ).select("-password");
+
+return res
+.status(200)
+.json(
+    new ApiResponse(200,user,"cover image updated succesfullty")
+)
+})
+
+
+const getUserChannelProfile= asyncHandler(async (req,res)=>{
+   const {username}=req.params
+
+   if(!username?.trim){
+    throw new ApiError(400,"username is missing");
+
+   }
+
+  const channel= await User.aggregate([
+    {
+      $match: {
+        username: username?.toLowerCase()
+      }
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers"
+      }
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo"
+      }
+    },
+    {
+      $addFields: {
+        subscribersCount: {
+          $size: "$subscribers"
+        },
+        channelsSubscribedToCount:{
+            $size:"$subscribedTo"
+
+        },
+        isSubscribed:{
+            $cond:{
+                if:{$in:[req.user?._id,"$subscribers.subscriber"]},
+                then:true,
+                else:false
+            }
+        },
+        isSubscribedTo:{
+            $cond:{
+                if:{$in:[req.user?._id,"$subscribedTo.subscriber"]},
+                then:true,
+                else:false
+            }
+        }
+      }
+    },
+
+    {
+        $project:{
+            fullname:1,
+            username:1,
+            subscribersCount:1,
+            channelsSubscribedToCount:1,
+            isSubscribedTo:1,
+            coverImage:1,
+            email:1
+
+        }
+    }
+  ]);
+
+})
+
+
+export { registerUser,loginUser,logoutUser,refreshAccessToken,changeCurrentPassword,getcurrentuser,updatAccountDetails,updateUserAvatar,getUserChannelProfile}
