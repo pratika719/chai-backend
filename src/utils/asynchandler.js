@@ -4,7 +4,10 @@ const asyncHandler=(requesthandler)=>{
             next(error);
         });
     }
-
+//async handler returns another function the 
+//requesthandler is a funtcn stored in it 
+//it tells that treat whatever is returned from reqhandler as a promise and then .cathc for rejected promise
+//
 
 }
 
